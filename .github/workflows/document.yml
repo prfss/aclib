@@ -13,7 +13,6 @@ env:
 jobs:
     doc:
         runs-on: ubuntu-latest
-        needs: build
         steps:
             - uses: actions/checkout@v3
             - name: Cargo doc
