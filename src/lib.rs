@@ -2,7 +2,6 @@
 pub mod at;
 pub mod boolarray;
 pub mod cmp;
-pub mod coordinate;
 pub mod fastarray;
 pub mod fenwicktree;
 pub mod io;
@@ -11,6 +10,7 @@ pub mod maxflow;
 pub mod mincostflow;
 pub mod monoid;
 pub mod number;
+pub mod point;
 pub mod quickselect;
 pub mod scc;
 pub mod segtree;
