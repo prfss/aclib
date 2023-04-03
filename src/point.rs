@@ -2,7 +2,7 @@ use crate::at::At;
 use crate::number::AsUsize;
 use std::ops::Add;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, std::hash::Hash)]
 pub struct Point {
     pub x: usize,
     pub y: usize,
@@ -35,7 +35,7 @@ impl Add<PointDelta> for Point {
     }
 }
 
-pub fn p<T: AsUsize>(x: &T, y: &T) -> Point {
+pub fn point<T: AsUsize>(x: &T, y: &T) -> Point {
     Point::new(x.as_usize(), y.as_usize())
 }
 
