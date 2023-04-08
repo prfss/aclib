@@ -1,6 +1,7 @@
 #![allow(clippy::many_single_char_names)]
 pub mod at;
 pub mod boolarray;
+pub mod chooser;
 pub mod cmp;
 pub mod fastarray;
 pub mod fenwicktree;
@@ -14,5 +15,6 @@ pub mod point;
 pub mod quickselect;
 pub mod scc;
 pub mod segtree;
+pub mod simplechooser;
 pub mod timer;
 pub mod unionfind;
