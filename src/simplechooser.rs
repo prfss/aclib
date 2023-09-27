@@ -21,7 +21,7 @@ impl<T> SimpleChooser<T> {
         if self.data.is_empty() {
             None
         } else {
-            self.data.get(rng.gen_range(0, self.data.len()))
+            self.data.get(rng.gen_range(0..self.data.len()))
         }
     }
 
@@ -29,7 +29,7 @@ impl<T> SimpleChooser<T> {
         if self.data.is_empty() {
             None
         } else {
-            Some(self.data.swap_remove(rng.gen_range(0, self.data.len())))
+            Some(self.data.swap_remove(rng.gen_range(0..self.data.len())))
         }
     }
 }

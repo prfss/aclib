@@ -45,7 +45,7 @@ impl<T, I: Goedel<T>> Chooser<T, I> {
         if self.data.is_empty() {
             None
         } else {
-            self.data.get(rng.gen_range(0, self.data.len()))
+            self.data.get(rng.gen_range(0..self.data.len()))
         }
     }
 
@@ -53,7 +53,7 @@ impl<T, I: Goedel<T>> Chooser<T, I> {
         if self.data.is_empty() {
             None
         } else {
-            let pos = rng.gen_range(0, self.data.len());
+            let pos = rng.gen_range(0..self.data.len());
             let value = self.data.swap_remove(pos);
             if pos < self.data.len() {
                 let idx = self.index_fun.mapping(&self.data[pos]);
