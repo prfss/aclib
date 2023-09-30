@@ -4,6 +4,5 @@ pub mod chooser;
 pub mod cmp;
 pub mod fastarray;
 pub mod point;
-pub mod quickselect;
 pub mod simplechooser;
 pub mod timer;
