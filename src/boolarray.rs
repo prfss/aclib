@@ -17,22 +17,13 @@ impl BoolArray {
         }
     }
 
-    /// $i$番目の要素を$\mathrm{true}$にします.
+    /// $i$番目の要素を$\mathrm{x}$にします.
     /// # 制約
     /// - $i \lt n$
     /// # 計算量
     /// - $O(1)$
-    pub fn set(&mut self, i: usize) {
-        self.data[i] = self.threshold;
-    }
-
-    /// $i$番目の要素を$\mathrm{false}$にします.
-    /// # 制約
-    /// - $i \lt n$
-    /// # 計算量
-    /// - $O(1)$
-    pub fn unset(&mut self, i: usize) {
-        self.data[i] = 0;
+    pub fn set(&mut self, i: usize, x: bool) {
+        self.data[i] = if x { self.threshold } else { 0 };
     }
 
     /// $i$番目の要素を取得します.
@@ -46,10 +37,10 @@ impl BoolArray {
 
     /// すべての要素を$\mathrm{false}$にします.
     /// # 制約
-    /// このメソッドを呼ぶ回数は[`std::usize::MAX`](https://doc.rust-lang.org/std/usize/constant.MAX.html)回未満
+    /// - このメソッドを呼ぶ回数は[`std::usize::MAX`](https://doc.rust-lang.org/std/usize/constant.MAX.html)回未満
     /// # 計算量
-    /// $O(1)$
-    pub fn init(&mut self) {
+    /// - $O(1)$
+    pub fn clear(&mut self) {
         self.threshold += 1;
     }
 }
