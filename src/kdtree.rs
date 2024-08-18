@@ -1,4 +1,6 @@
 //! ユークリッド空間における点の索引
+use std::collections::BinaryHeap;
+
 use ordered_float::OrderedFloat;
 
 /// $n$次元ユークリッド空間における点の索引を表す構造体です
@@ -15,17 +17,6 @@ impl KdTree {
         let mut nodes = Vec::with_capacity(2 * vs.len());
         Self::from_vec_internal(vs, 0, &mut nodes);
         Self { nodes }
-    }
-
-    /// この索引に含まれる点のうち,`query`に最も近い点を返します.
-    pub fn find_nearest_neighbor<Q>(&self, query: &Q) -> Option<(f64, &KdPoint)>
-    where
-        Q: KdFnnQuery,
-    {
-        let mut dist2 = std::f64::MAX;
-        let mut np = None;
-        self.find_nearest_neighbor_internal(self.nodes.len() - 1, query, &mut dist2, &mut np);
-        np.map(|np| (dist2.sqrt(), np))
     }
 
     fn from_vec_internal(vs: &mut [KdPoint], axis: usize, nodes: &mut Vec<KdNode>) -> usize {
@@ -58,26 +49,63 @@ impl KdTree {
         nodes.len() - 1
     }
 
-    fn find_nearest_neighbor_internal<'a, Q>(
+    /// この索引に含まれる点のうち,`query`に最も近い点を返します.
+    pub fn find_nearest_neighbor<Q>(&self, query: &Q) -> Option<(f64, &KdPoint)>
+    where
+        Q: KdFnnQuery,
+    {
+        self.find_k_nearest_neighbors(query, 1).into_iter().next()
+    }
+
+    /// この索引に含まれる点のうち,`query`に最も近い高々`k`個の点を返します.
+    pub fn find_k_nearest_neighbors<Q>(&self, query: &Q, k: usize) -> Vec<(f64, &KdPoint)>
+    where
+        Q: KdFnnQuery,
+    {
+        let mut res = BinaryHeap::new();
+        self.find_k_nearest_neighbor_internal(k, self.nodes.len() - 1, query, &mut res);
+        let res: Vec<_> = res
+            .into_iter()
+            .map(|HeapElem { dist, node_i }| {
+                (
+                    dist.0,
+                    if let KdNode::Leaf { point } = &self.nodes[node_i] {
+                        point
+                    } else {
+                        unreachable!("must be a Leaf")
+                    },
+                )
+            })
+            .collect();
+        assert!(res.len() <= k);
+        res
+    }
+
+    fn find_k_nearest_neighbor_internal<'a, Q>(
         &'a self,
+        k: usize,
         node_i: usize,
         query: &Q,
-        min_dist: &mut f64,
-        np: &mut Option<&'a KdPoint>,
+        //min_dist: &mut f64,
+        res: &mut BinaryHeap<HeapElem>,
     ) where
         Q: KdFnnQuery,
     {
-        let dist = Self::node_dist(query, &self.nodes[node_i]);
-        if dist >= *min_dist {
+        let dist = OrderedFloat(Self::node_dist(query, &self.nodes[node_i]));
+        if res.len() == k && dist >= res.peek().map(|x| x.dist).unwrap_or(std::f64::MAX.into()) {
             return;
         }
 
         match &self.nodes[node_i] {
-            KdNode::Leaf { ref point } => {
-                if dist < *min_dist {
-                    *min_dist = dist;
-                    *np = Some(point);
+            KdNode::Leaf { .. } => {
+                res.push(HeapElem { dist, node_i });
+
+                assert!(res.len() <= k + 1);
+
+                if res.len() == k + 1 {
+                    res.pop();
                 }
+
                 return;
             }
             KdNode::Internal { left, right, .. } => {
@@ -87,11 +115,11 @@ impl KdTree {
                 let right_dist = Self::node_dist(query, &self.nodes[right]);
 
                 if left_dist < right_dist {
-                    self.find_nearest_neighbor_internal(left, query, min_dist, np);
-                    self.find_nearest_neighbor_internal(right, query, min_dist, np);
+                    self.find_k_nearest_neighbor_internal(k, left, query, res);
+                    self.find_k_nearest_neighbor_internal(k, right, query, res);
                 } else {
-                    self.find_nearest_neighbor_internal(right, query, min_dist, np);
-                    self.find_nearest_neighbor_internal(left, query, min_dist, np);
+                    self.find_k_nearest_neighbor_internal(k, right, query, res);
+                    self.find_k_nearest_neighbor_internal(k, left, query, res);
                 }
             }
         };
@@ -137,6 +165,12 @@ impl KdTree {
             }
         };
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct HeapElem {
+    dist: OrderedFloat<f64>,
+    node_i: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -271,7 +305,7 @@ mod tests {
     }
 
     #[test]
-    fn kdtree_fnn_works() {
+    fn kdtree_find_nn_works() {
         let point_count = 10000;
         let query_count = 100;
         let dim = 5;
@@ -304,11 +338,39 @@ mod tests {
     #[test]
     fn kdtree_find_self() {
         let mut rng = Pcg64::seed_from_u64(3141592653);
-        let (tree, vs) = gen_kdtree(100, 5, &mut rng);
+        let (tree, vs) = gen_kdtree(1000, 5, &mut rng);
 
         for v in vs {
             let r = tree.find_nearest_neighbor(&v).map(|r| r.1);
             assert_eq!(r, Some(&v));
+        }
+    }
+
+    #[test]
+    fn kdtree_find_knn_works() {
+        let mut rng = Pcg64::seed_from_u64(3141592653);
+        let (tree, mut vs) = gen_kdtree(1000, 5, &mut rng);
+
+        let query_count = 100;
+        let qs: Vec<Vec<f64>> = (0..query_count)
+            .map(|_| (0..5).map(|_| rng.gen_range(-10000.0..10000.0)).collect())
+            .collect();
+
+        let k = 100;
+
+        for q in qs {
+            let mut res = tree.find_k_nearest_neighbors(&q, k);
+            res.sort_by_cached_key(|x| OrderedFloat(x.0));
+            vs.sort_by_cached_key(|x| {
+                OrderedFloat(
+                    x.iter()
+                        .zip(&q)
+                        .map(|(a, b)| (a - b) * (a - b))
+                        .sum::<f64>(),
+                )
+            });
+
+            assert!(res.iter().map(|r| r.1).eq(vs[..k].iter()));
         }
     }
 
