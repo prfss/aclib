@@ -1,4 +1,4 @@
-//! ユークリッド空間における点の索引
+//! ユークリッド空間における点の索引です.
 use std::collections::BinaryHeap;
 
 use ordered_float::OrderedFloat;
