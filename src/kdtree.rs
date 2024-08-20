@@ -1,28 +1,31 @@
 //! ユークリッド空間における点の索引です.
-use std::collections::BinaryHeap;
+use std::{collections::BinaryHeap, marker::PhantomData};
 
 use ordered_float::OrderedFloat;
 
 /// $n$次元ユークリッド空間における点の索引を表す構造体です
 #[derive(Clone, Debug)]
-pub struct KdTree {
-    nodes: Vec<KdNode>,
+pub struct KdTree<P> {
+    nodes: Vec<KdNode<P>>,
 }
 
 pub type KdPoint = Vec<f64>;
 
-impl KdTree {
+impl<P> KdTree<P>
+where
+    P: AsPoint + Clone,
+{
     /// `vs`からなる索引を作ります.
-    pub fn from_vec(vs: &mut [KdPoint]) -> Self {
+    pub fn from_vec(vs: &mut [P]) -> Self {
         let mut nodes = Vec::with_capacity(2 * vs.len());
         Self::from_vec_internal(vs, 0, &mut nodes);
         Self { nodes }
     }
 
-    fn from_vec_internal(vs: &mut [KdPoint], axis: usize, nodes: &mut Vec<KdNode>) -> usize {
+    fn from_vec_internal(vs: &mut [P], axis: usize, nodes: &mut Vec<KdNode<P>>) -> usize {
         assert!(!vs.is_empty());
 
-        let dim = vs[0].len();
+        let dim = vs[0].as_point().len();
 
         if vs.len() == 1 {
             let leaf = KdNode::Leaf {
@@ -31,7 +34,7 @@ impl KdTree {
             nodes.push(leaf);
         } else {
             let mid = vs.len() / 2;
-            let _ = vs.select_nth_unstable_by_key(mid, |v| OrderedFloat(v[axis]));
+            let _ = vs.select_nth_unstable_by_key(mid, |v| OrderedFloat(v.as_point()[axis]));
             let (pre, suf) = vs.split_at_mut(mid);
             let new_axis = (axis + 1) % dim;
             let left = KdTree::from_vec_internal(pre, new_axis, nodes);
@@ -48,9 +51,14 @@ impl KdTree {
         }
         nodes.len() - 1
     }
+}
 
+impl<P> KdTree<P>
+where
+    P: AsPoint,
+{
     /// この索引に含まれる点のうち,`query`に最も近い点を返します.
-    pub fn find_nearest_neighbor<Q>(&self, query: &Q) -> Option<(f64, &KdPoint)>
+    pub fn find_nearest_neighbor<Q>(&self, query: &Q) -> Option<(f64, &P)>
     where
         Q: KdFnnQuery,
     {
@@ -58,7 +66,7 @@ impl KdTree {
     }
 
     /// この索引に含まれる点のうち,`query`に最も近い高々`k`個の点を返します.
-    pub fn find_k_nearest_neighbors<Q>(&self, query: &Q, k: usize) -> Vec<(f64, &KdPoint)>
+    pub fn find_k_nearest_neighbors<Q>(&self, query: &Q, k: usize) -> Vec<(f64, &P)>
     where
         Q: KdFnnQuery,
     {
@@ -86,7 +94,6 @@ impl KdTree {
         k: usize,
         node_i: usize,
         query: &Q,
-        //min_dist: &mut f64,
         res: &mut BinaryHeap<HeapElem>,
     ) where
         Q: KdFnnQuery,
@@ -125,45 +132,99 @@ impl KdTree {
         };
     }
 
-    fn node_dist<Q>(query: &Q, node: &KdNode) -> f64
+    fn node_dist<Q>(query: &Q, node: &KdNode<P>) -> f64
     where
         Q: KdFnnQuery,
     {
         match node {
             KdNode::Internal { mbb, .. } => query.mbb_dist(mbb),
-            KdNode::Leaf { point } => query.dist(point),
+            KdNode::Leaf { point } => query.dist(point.as_point()),
         }
     }
 
     /// この索引に含まれる点のうち,`query`に含まれる点をすべて返します.
-    pub fn find_in_range<Q>(&self, query: &Q) -> Vec<&KdPoint>
+    pub fn find_in_range<'a, Q>(&'a self, query: &'a Q) -> Vec<&'a P>
     where
         Q: KdRangeQuery,
     {
-        let mut res = vec![];
-        self.find_in_range_internal(self.nodes.len() - 1, query, &mut res);
-        res
+        self.accumulate::<Q, PointAccumulator<P>, P, Vec<&P>>(query)
     }
 
-    fn find_in_range_internal<'a, Q>(&'a self, node_i: usize, query: &Q, res: &mut Vec<&'a KdPoint>)
+    /// この索引に含まれる点のうち,`query`に含まれる点のデータを集計します.
+    pub fn accumulate<'a, Q, A, D, R>(&'a self, query: &'a Q) -> R
     where
+        P: AsData<D>,
         Q: KdRangeQuery,
+        A: KdAccumulator<'a, D, R>,
+        D: 'a,
+    {
+        self.accumulate_internal::<Q, A, D, R>(self.nodes.len() - 1, query, A::empty())
+    }
+
+    fn accumulate_internal<'a, Q, A, D, R>(&'a self, node_i: usize, query: &Q, acc: R) -> R
+    where
+        P: AsData<D>,
+        Q: KdRangeQuery,
+        A: KdAccumulator<'a, D, R>,
+        D: 'a,
     {
         match &self.nodes[node_i] {
-            KdNode::Leaf { ref point } => {
-                if query.includes(point) {
-                    res.push(point);
-                }
+            KdNode::Leaf { point } => {
+                if query.includes(point.as_point()) {
+                    return A::op(acc, point.as_data());
+                } else {
+                    return acc;
+                };
             }
             KdNode::Internal { mbb, left, right } => {
-                if !query.mbb_overlaps(mbb) {
-                    return;
+                if !query.mbb_overlaps(&mbb) {
+                    return acc;
                 }
 
-                self.find_in_range_internal(*left, query, res);
-                self.find_in_range_internal(*right, query, res);
+                let acc = self.accumulate_internal::<Q, A, D, R>(*left, query, acc);
+                self.accumulate_internal::<Q, A, D, R>(*right, query, acc)
             }
-        };
+        }
+    }
+}
+
+pub trait AsPoint {
+    fn as_point(&self) -> &KdPoint;
+}
+
+impl AsPoint for KdPoint {
+    fn as_point(&self) -> &KdPoint {
+        self
+    }
+}
+
+pub trait AsData<D> {
+    fn as_data(&self) -> &D;
+}
+
+impl<P> AsData<P> for P {
+    fn as_data(&self) -> &P {
+        self
+    }
+}
+
+pub trait KdAccumulator<'a, D, R> {
+    fn empty() -> R;
+    fn op(acc: R, data: &'a D) -> R;
+}
+
+struct PointAccumulator<P> {
+    _data: PhantomData<P>,
+}
+
+impl<'a, P> KdAccumulator<'a, P, Vec<&'a P>> for PointAccumulator<P> {
+    fn empty() -> Vec<&'a P> {
+        vec![]
+    }
+
+    fn op(mut acc: Vec<&'a P>, data: &'a P) -> Vec<&'a P> {
+        acc.push(data);
+        acc
     }
 }
 
@@ -224,36 +285,39 @@ impl From<&KdPoint> for Rect {
 }
 
 #[derive(Clone, Debug)]
-enum KdNode {
+enum KdNode<P> {
     Internal {
         mbb: Rect,
         left: usize,
         right: usize,
     },
     Leaf {
-        point: KdPoint,
+        point: P,
     },
 }
 
-impl KdNode {
+impl<P> KdNode<P>
+where
+    P: AsPoint,
+{
     fn l(&self, axis: usize) -> f64 {
         match self {
             KdNode::Internal { mbb: rect, .. } => rect.l(axis),
-            KdNode::Leaf { point } => point[axis],
+            KdNode::Leaf { point } => point.as_point()[axis],
         }
     }
 
     fn u(&self, axis: usize) -> f64 {
         match self {
             KdNode::Internal { mbb: rect, .. } => rect.u(axis),
-            KdNode::Leaf { point } => point[axis],
+            KdNode::Leaf { point } => point.as_point()[axis],
         }
     }
 }
 
 pub trait KdFnnQuery {
     fn dist(&self, p: &KdPoint) -> f64 {
-        self.mbb_dist(&Rect::from(p))
+        self.mbb_dist(&Rect::from(p.as_point()))
     }
     fn mbb_dist(&self, mbb: &Rect) -> f64;
 }
@@ -294,7 +358,7 @@ mod tests {
     use rand::prelude::*;
     use rand_pcg::Pcg64;
 
-    fn gen_kdtree<R: Rng>(n: usize, dim: usize, rng: &mut R) -> (KdTree, Vec<KdPoint>) {
+    fn gen_kdtree<R: Rng>(n: usize, dim: usize, rng: &mut R) -> (KdTree<KdPoint>, Vec<KdPoint>) {
         let mut vs: Vec<_> = (0..n)
             .map(|_| (0..dim).map(|_| rng.gen_range(-10000.0..10000.0)).collect())
             .collect();
@@ -449,6 +513,78 @@ mod tests {
             naive.sort_by(|a, b| a.partial_cmp(b).unwrap());
             let mut ans = tree.find_in_range(&q);
             ans.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+            assert_eq!(naive, ans);
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct Point {
+        point: Vec<f64>,
+        data: usize,
+    }
+
+    impl AsPoint for Point {
+        fn as_point(&self) -> &KdPoint {
+            &self.point
+        }
+    }
+
+    impl AsData<usize> for Point {
+        fn as_data(&self) -> &usize {
+            &self.data
+        }
+    }
+
+    struct SumAccumulator;
+    impl<'a> KdAccumulator<'a, usize, usize> for SumAccumulator {
+        fn empty() -> usize {
+            0
+        }
+        fn op(acc: usize, data: &usize) -> usize {
+            acc + data
+        }
+    }
+
+    #[test]
+    fn kdtree_accumulator_works() {
+        let mut rng = Pcg64::seed_from_u64(3141592653);
+        let n = 1000;
+        let dim = 2;
+
+        let mut vs = vec![];
+        for _ in 0..n {
+            let point = (0..dim).map(|_| rng.gen_range(-10000.0..10000.0)).collect();
+            let data = rng.gen_range(0..100000);
+            vs.push(Point { point, data });
+        }
+
+        let t = KdTree::from_vec(&mut vs);
+
+        let query_count = 100;
+
+        let qs: Vec<_> = (0..query_count)
+            .map(|_| {
+                let center = (0..dim).map(|_| rng.gen_range(-10000.0..10000.0)).collect();
+                let radius2 = rng.gen_range(1_000_000.0..25_000_000.0);
+                Sphere::new(center, radius2)
+            })
+            .collect();
+
+        for q in qs {
+            let naive = vs
+                .iter()
+                .filter(|v| {
+                    (0..dim)
+                        .map(|i| v.point[i] - q.center[i])
+                        .map(|x| x * x)
+                        .sum::<f64>()
+                        <= q.radius2
+                })
+                .map(|v| v.data)
+                .sum::<usize>();
+
+            let ans = t.accumulate::<_, SumAccumulator, _, _>(&q);
 
             assert_eq!(naive, ans);
         }
