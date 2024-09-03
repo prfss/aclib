@@ -1,7 +1,7 @@
 //! 有向木の最小共通祖先(Lowest Common Ancestor)を求めます.
 
 /// 最小共通祖先を求めるための構造体です
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Lca {
     n: usize,
     log_max_k: usize,

@@ -8,6 +8,7 @@ pub trait Goedel<T> {
     fn mapping(&self, a: &T) -> usize;
 }
 
+#[derive(Clone)]
 pub struct Chooser<T, I> {
     data: Vec<T>,
     pos: Vec<usize>,

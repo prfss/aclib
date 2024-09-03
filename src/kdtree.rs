@@ -4,7 +4,7 @@ use std::{collections::BinaryHeap, marker::PhantomData};
 use ordered_float::OrderedFloat;
 
 /// $n$次元ユークリッド空間における点の索引を表す構造体です
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct KdTree<P> {
     nodes: Vec<KdNode<P>>,
 }

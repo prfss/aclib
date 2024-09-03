@@ -5,6 +5,7 @@
 //! 更新した要素の数を$m$として,初期化を$O(m)$で行うことができます.
 use std::ops::Index;
 
+#[derive(Clone)]
 pub struct FastArray<T> {
     data: Vec<T>,
     updated_index: Vec<usize>,

@@ -3,7 +3,7 @@
 //! 要素の追加・取得を$O(1)$で行うことができます.
 use rand::Rng;
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct SimpleChooser<T> {
     data: Vec<T>,
 }
