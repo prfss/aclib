@@ -1,6 +1,6 @@
 #![allow(unused, clippy::needless_range_loop)]
 use aclib::kdtree;
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
 use ordered_float::OrderedFloat;
 use rand::{prelude::*, SeedableRng};
 use rand_pcg::Pcg64;
@@ -13,7 +13,12 @@ fn bench_kd_tree_creation_internal(c: &mut Criterion, n: usize, dim: usize) {
             let vs: Vec<Vec<_>> = (0..n)
                 .map(|_| (0..dim).map(|_| rng.gen_range(-10000.0..10000.0)).collect())
                 .collect();
-            b.iter(|| kdtree::KdTree::from_vec(&mut vs.clone()));
+
+            b.iter_batched(
+                || vs.clone(),
+                |mut vs| kdtree::KdTree::from(vs.as_mut_slice()),
+                BatchSize::SmallInput,
+            );
         },
     );
 }
@@ -32,11 +37,16 @@ fn bench_kdtree_fnn_internal(c: &mut Criterion, n: usize, dim: usize) {
             .map(|_| (0..dim).map(|_| rng.gen_range(-10000.0..10000.0)).collect())
             .collect();
 
-        let tree = kdtree::KdTree::from_vec(&mut vs);
-        b.iter(|| {
-            let query: Vec<_> = (0..dim).map(|_| rng.gen_range(-10000.0..10000.0)).collect();
-            tree.find_nearest_neighbor(&query);
-        });
+        let tree = kdtree::KdTree::from(vs.as_mut_slice());
+        b.iter_batched(
+            || {
+                (0..dim)
+                    .map(|_| rng.gen_range(-10000.0..10000.0))
+                    .collect::<Vec<_>>()
+            },
+            |query| tree.find_nearest_neighbor(&query),
+            BatchSize::SmallInput,
+        );
     });
 }
 
@@ -56,18 +66,25 @@ fn bench_naive_fnn_internal(c: &mut Criterion, n: usize, dim: usize) {
             .map(|_| (0..dim).map(|_| rng.gen_range(-10000.0..10000.0)).collect())
             .collect();
 
-        b.iter(|| {
-            let query: Vec<_> = (0..dim).map(|_| rng.gen_range(-10000.0..10000.0)).collect();
-            vs.iter()
-                .min_by_key(|p| {
-                    OrderedFloat(
-                        (0..dim)
-                            .map(|i| (p[i] - query[i]) * (p[i] - query[i]))
-                            .sum::<f64>(),
-                    )
-                })
-                .unwrap()
-        });
+        b.iter_batched(
+            || {
+                (0..dim)
+                    .map(|_| rng.gen_range(-10000.0..10000.0))
+                    .collect::<Vec<_>>()
+            },
+            |query| {
+                vs.iter()
+                    .min_by_key(|p| {
+                        OrderedFloat(
+                            (0..dim)
+                                .map(|i| (p[i] - query[i]) * (p[i] - query[i]))
+                                .sum::<f64>(),
+                        )
+                    })
+                    .unwrap()
+            },
+            BatchSize::SmallInput,
+        );
     });
 }
 
@@ -87,16 +104,20 @@ fn bench_kdtree_range_internal(c: &mut Criterion, n: usize) {
         let mut vs: Vec<Vec<_>> = (0..n)
             .map(|_| (0..dim).map(|_| rng.gen_range(-10000.0..10000.0)).collect())
             .collect();
-        let tree = kdtree::KdTree::from_vec(&mut vs);
-        b.iter(|| {
-            let dx = rng.gen_range(1000.0..5000.0);
-            let dy = rng.gen_range(1000.0..5000.0);
-            let x = rng.gen_range(-10000.0..10000.0 - dx);
-            let y = rng.gen_range(-10000.0..10000.0 - dy);
-            let query = kdtree::Rect::new(vec![x, y], vec![x + dx, y + dy]);
-
-            tree.find_in_range(&query);
-        });
+        let tree = kdtree::KdTree::from(vs.as_mut_slice());
+        b.iter_batched(
+            || {
+                let dx = rng.gen_range(1000.0..5000.0);
+                let dy = rng.gen_range(1000.0..5000.0);
+                let x = rng.gen_range(-10000.0..10000.0 - dx);
+                let y = rng.gen_range(-10000.0..10000.0 - dy);
+                kdtree::Rect::new(vec![x, y], vec![x + dx, y + dy])
+            },
+            |query| {
+                tree.find_in_range(&query);
+            },
+            BatchSize::SmallInput,
+        );
     });
 }
 
@@ -113,17 +134,21 @@ fn bench_naive_range_internal(c: &mut Criterion, n: usize) {
         let mut vs: Vec<Vec<_>> = (0..n)
             .map(|_| (0..dim).map(|_| rng.gen_range(-10000.0..10000.0)).collect())
             .collect();
-        b.iter(|| {
-            let dx = rng.gen_range(1000.0..5000.0);
-            let dy = rng.gen_range(1000.0..5000.0);
-            let x = rng.gen_range(-10000.0..10000.0 - dx);
-            let y = rng.gen_range(-10000.0..10000.0 - dy);
-            let query = kdtree::Rect::new(vec![x, y], vec![x + dx, y + dy]);
-
-            vs.iter()
-                .filter(|p| (0..dim).all(|i| query.l(i) <= p[i] && p[i] <= query.u(i)))
-                .count();
-        });
+        b.iter_batched(
+            || {
+                let dx = rng.gen_range(1000.0..5000.0);
+                let dy = rng.gen_range(1000.0..5000.0);
+                let x = rng.gen_range(-10000.0..10000.0 - dx);
+                let y = rng.gen_range(-10000.0..10000.0 - dy);
+                kdtree::Rect::new(vec![x, y], vec![x + dx, y + dy])
+            },
+            |query| {
+                vs.iter()
+                    .filter(|p| (0..dim).all(|i| query.l(i) <= p[i] && p[i] <= query.u(i)))
+                    .count();
+            },
+            BatchSize::SmallInput,
+        );
     });
 }
 

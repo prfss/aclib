@@ -11,47 +11,51 @@ pub struct KdTree<P> {
 
 pub type Point = Vec<f64>;
 
-impl<P> KdTree<P>
+impl<T> From<&mut [T]> for KdTree<T>
+where
+    T: AsPoint + Clone,
+{
+    fn from(vs: &mut [T]) -> Self {
+        let mut nodes = Vec::with_capacity(2 * vs.len());
+        from_vec(vs, 0, &mut nodes);
+        KdTree { nodes }
+    }
+}
+
+fn from_vec<P>(vs: &mut [P], axis: usize, nodes: &mut Vec<KdNode<P>>) -> usize
 where
     P: AsPoint + Clone,
 {
-    /// `vs`からなる索引を作ります.
-    pub fn from_vec(vs: &mut [P]) -> Self {
-        let mut nodes = Vec::with_capacity(2 * vs.len());
-        Self::from_vec_internal(vs, 0, &mut nodes);
-        Self { nodes }
+    assert!(!vs.is_empty());
+
+    let dim = vs[0].as_point().len();
+
+    if vs.len() == 1 {
+        let leaf = KdNode::Leaf {
+            point: vs[0].clone(),
+        };
+        nodes.push(leaf);
+    } else {
+        let mid = vs.len() / 2;
+        let _ = vs.select_nth_unstable_by_key(mid, |v| OrderedFloat(v.as_point()[axis]));
+        let (pre, suf) = vs.split_at_mut(mid);
+        let new_axis = (axis + 1) % dim;
+        let left = from_vec(pre, new_axis, nodes);
+        let right = from_vec(suf, new_axis, nodes);
+        let bottom_left = (0..dim)
+            .map(|axis| nodes[left].l(axis).min(nodes[right].l(axis)))
+            .collect();
+        let top_right = (0..dim)
+            .map(|axis| nodes[left].u(axis).max(nodes[right].u(axis)))
+            .collect();
+
+        let mbb = Rect::new(bottom_left, top_right);
+        nodes.push(KdNode::Internal { mbb, left, right });
     }
-
-    fn from_vec_internal(vs: &mut [P], axis: usize, nodes: &mut Vec<KdNode<P>>) -> usize {
-        assert!(!vs.is_empty());
-
-        let dim = vs[0].as_point().len();
-
-        if vs.len() == 1 {
-            let leaf = KdNode::Leaf {
-                point: vs[0].clone(),
-            };
-            nodes.push(leaf);
-        } else {
-            let mid = vs.len() / 2;
-            let _ = vs.select_nth_unstable_by_key(mid, |v| OrderedFloat(v.as_point()[axis]));
-            let (pre, suf) = vs.split_at_mut(mid);
-            let new_axis = (axis + 1) % dim;
-            let left = KdTree::from_vec_internal(pre, new_axis, nodes);
-            let right = KdTree::from_vec_internal(suf, new_axis, nodes);
-            let bottom_left = (0..dim)
-                .map(|axis| nodes[left].l(axis).min(nodes[right].l(axis)))
-                .collect();
-            let top_right = (0..dim)
-                .map(|axis| nodes[left].u(axis).max(nodes[right].u(axis)))
-                .collect();
-
-            let mbb = Rect::new(bottom_left, top_right);
-            nodes.push(KdNode::Internal { mbb, left, right });
-        }
-        nodes.len() - 1
-    }
+    nodes.len() - 1
 }
+
+impl<P> KdTree<P> where P: AsPoint + Clone {}
 
 impl<P> KdTree<P>
 where
@@ -363,7 +367,7 @@ mod tests {
             .map(|_| (0..dim).map(|_| rng.gen_range(-10000.0..10000.0)).collect())
             .collect();
 
-        let tree = KdTree::from_vec(&mut vs);
+        let tree = KdTree::from(vs.as_mut_slice());
 
         (tree, vs)
     }
@@ -559,7 +563,7 @@ mod tests {
             vs.push(DataPoint { point, data });
         }
 
-        let t = KdTree::from_vec(&mut vs);
+        let t = KdTree::from(vs.as_mut_slice());
 
         let query_count = 100;
 
