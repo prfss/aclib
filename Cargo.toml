@@ -19,3 +19,7 @@ rayon-core = "=1.7.0"
 [[bench]]
 harness = false
 name = "kdtree"
+
+[[bench]]
+harness = false
+name = "depq"
