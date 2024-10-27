@@ -332,6 +332,11 @@ where
     T: Ord,
 {
     debug_assert!(i.is_even() && j.is_odd());
+
+    if data[i] > data[j] {
+        return false;
+    }
+
     let ni1 = (i << 1) + 2;
     if ni1 >= data.len() {
         return true;
@@ -369,6 +374,8 @@ mod tests {
         assert!(!is_interval_heap(&[0, 1, 2, 3, 4, 5, 6, 7]));
         assert!(!is_interval_heap(&[0, 1, 2]));
         assert!(!is_interval_heap(&[0, 2, 1, 3]));
+        assert!(!is_interval_heap(&[5, 1]));
+        assert!(!is_interval_heap(&[1, 5, 3, 2, 1]));
     }
 
     #[test]
