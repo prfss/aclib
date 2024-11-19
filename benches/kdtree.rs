@@ -172,6 +172,7 @@ fn bench_kdtree_prod(c: &mut Criterion) {
     bench_kdtree_prod_internal(c, 100);
     bench_kdtree_prod_internal(c, 1000);
     bench_kdtree_prod_internal(c, 10000);
+    bench_kdtree_prod_internal(c, 100000);
 }
 
 fn bench_naive_prod_internal(c: &mut Criterion, n: usize) {
@@ -198,6 +199,7 @@ fn bench_naive_prod(c: &mut Criterion) {
     bench_naive_prod_internal(c, 100);
     bench_naive_prod_internal(c, 1000);
     bench_naive_prod_internal(c, 10000);
+    bench_naive_prod_internal(c, 100000);
 }
 
 criterion_group!(
