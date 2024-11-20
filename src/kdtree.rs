@@ -100,7 +100,7 @@ impl CommutativeMonoid for () {
     }
 }
 
-/// (`default()`を点に対応させることで)範囲内の点の数を数えることができる可換モノイドです.
+/// ([`default()`](Counter::default())を点に対応させることで)範囲内の点の数を数えることができる可換モノイドです.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Counter(pub usize);
 
@@ -176,7 +176,7 @@ where
     P: Point + TryFromIterator<P::T> + Clone,
     V: CommutativeMonoid + Default,
 {
-    /// 点に対応する値を`V::default()`として [`KdTree`] を構築します.
+    /// 点に対応する値を[`V::default()`](Default::default())として[`KdTree`]を構築します.
     fn from(vs: &mut [P]) -> Self {
         let mut nodes = Vec::with_capacity(2 * vs.len());
         from_vec(&WithDefault {}, vs, 0, &mut nodes);
@@ -245,7 +245,7 @@ where
 {
     /// `query`に最も近い点を返します.
     ///
-    /// 実行例は [`KdTree::find_k_nearest_neighbors`] を参照.
+    /// 実行例は[`KdTree::find_k_nearest_neighbors`]を参照.
     pub fn find_nearest_neighbor<Q>(&self, query: &Q) -> Option<(Q::D, &P)>
     where
         Q: FnnQuery<P>,
@@ -380,8 +380,8 @@ where
     /// 範囲`query`に含まれる点に対応する値の総積を求めます.
     ///
     /// # 実行例
-    /// 以下は矩形に含まれる点の数を求める例です. [`Counter`] のように [`Default`] を実装した [`CommutativeMonoid`] であれば,
-    /// データを明示的に与えずに`KdTree`を構築できます.
+    /// 以下は矩形に含まれる点の数を求める例です.[`Counter`]のように[`Default`]を実装した[`CommutativeMonoid`]であれば,
+    /// データを明示的に与えずに[`KdTree`]を構築できます.
     /// ```
     /// use aclib::kdtree::{Counter, KdTree, Rect};
     ///
@@ -622,7 +622,7 @@ where
 {
     /// 距離を表す型です.
     type D;
-    /// 点$p$との距離を返します.デフォルト実装では点を退化した超直方体とみなしてmbb_distを呼びます.
+    /// 点$p$との距離を返します.デフォルト実装では点を退化した超直方体とみなして[`FnnQuery::mbb_dist`]を呼びます.
     fn dist(&self, p: &P) -> Self::D {
         self.mbb_dist(&Rect::from(p))
     }
@@ -652,7 +652,7 @@ pub trait RangeQuery<P>
 where
     P: Point,
 {
-    /// 点$p$を含むかどうかを返します.デフォルト実装では点を退化した超直方体とみなしてmbb_overlapsを呼びます.
+    /// 点$p$を含むかどうかを返します.デフォルト実装では点を退化した超直方体とみなして[`RangeQuery::mbb_overlaps`]を呼びます.
     fn includes(&self, p: &P) -> bool {
         self.mbb_overlaps(&Rect::from(p))
     }
