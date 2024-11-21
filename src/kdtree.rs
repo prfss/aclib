@@ -102,7 +102,13 @@ impl CommutativeMonoid for () {
 
 /// ([`default()`](Counter::default())を点に対応させることで)範囲内の点の数を数えることができる可換モノイドです.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct Counter(pub usize);
+pub struct Counter(usize);
+
+impl Counter {
+    pub fn count(&self) -> usize {
+        self.0
+    }
+}
 
 impl CommutativeMonoid for Counter {
     fn op(x: &Self, y: &Self) -> Self {
@@ -389,7 +395,7 @@ where
     ///
     /// let tree: KdTree<[i64; 2], Counter> = KdTree::from(ps.as_mut_slice());
     /// let query = Rect::new([0, 0], [2, 2]);
-    /// let count = tree.prod(&query).0;
+    /// let count = tree.prod(&query).count();
     ///
     /// assert_eq!(count, 3);
     /// ```
@@ -921,7 +927,7 @@ mod tests {
                 .filter(|v| (0..q.dim()).all(|i| q.range[i].0 <= v[i] && v[i] <= q.range[i].1))
                 .count();
 
-            let ans = tree.prod(&q).0;
+            let ans = tree.prod(&q).count();
 
             assert_eq!(naive, ans);
         }
