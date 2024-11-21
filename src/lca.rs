@@ -1,6 +1,29 @@
 //! 有向木の最小共通祖先(Lowest Common Ancestor)を求めます.
 
 /// 最小共通祖先を求めるための構造体です
+///
+/// # 実行例
+/// ```
+/// // 0-1-2-4
+/// //   \-3
+/// //      \-5
+/// //
+/// // 6-7
+/// use aclib::lca::Lca;
+///
+/// let mut lca = Lca::new(10);
+/// lca.add_edge(0, 1);
+/// lca.add_edge(1, 2);
+/// lca.add_edge(2, 4);
+/// lca.add_edge(1, 3);
+/// lca.add_edge(3, 5);
+/// lca.add_edge(6, 7);
+///
+/// assert_eq!(lca.get(0, 4), Some(0));
+/// assert_eq!(lca.get(6, 7), Some(6));
+/// assert_eq!(lca.get(5, 2), Some(1));
+/// assert_eq!(lca.get(0, 7), None);
+/// ```
 #[derive(Clone)]
 pub struct Lca {
     n: usize,
@@ -30,7 +53,7 @@ impl Lca {
     /// 頂点$u$から頂点$v$へ辺を追加します.
     /// # 制約
     /// - $0 \le u,v \lt n$
-    /// - `get`の呼出しより後に呼ぶことはできない
+    /// - [`Lca::get`]の呼出しより後に呼ぶことはできない
     /// # 計算量
     /// - $O(1)$
     pub fn add_edge(&mut self, u: usize, v: usize) {
@@ -43,7 +66,7 @@ impl Lca {
 
     /// 頂点$u$と頂点$v$の最小共通祖先を求めます.
     /// # 制約
-    /// - このメソッドの呼出しより後に,`add_edge`を呼ぶことはできない
+    /// - このメソッドの呼出しより後に,[`Lca::add_edge`]を呼ぶことはできない
     /// # 計算量
     /// - $O(\log{n})$
     pub fn get(&mut self, mut u: usize, mut v: usize) -> Option<usize> {
