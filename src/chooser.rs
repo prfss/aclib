@@ -1,6 +1,40 @@
 //! 集合から一様ランダムに要素を取得できるデータ構造です.
 //!
 //! 要素の追加・削除・取得が$O(1)$で行えます.
+//!
+//! # 実行例
+//! 以下は2次元グリッド上のセルを管理する例です.
+//! ```
+//! use rand::prelude::*;
+//! use aclib::chooser::{Chooser, Goedel};
+//!
+//! struct ToIndex {
+//!     n: usize
+//! };
+//! impl Goedel<(usize, usize)> for ToIndex {
+//!     fn mapping(&self, &(x, y): &(usize, usize)) -> usize {
+//!         x * self.n + y
+//!     }
+//! }
+//!
+//! let mut expected = vec![];
+//! let mut chooser = Chooser::new(100, ToIndex { n: 10 });
+//! for x in 0..10 {
+//!     for y in 0..10 {
+//!         expected.push((x, y));
+//!         chooser.add((x, y));
+//!     }
+//! }
+//!
+//! let mut actual = vec![];
+//! while let Some((x, y)) = chooser.sample_remove(&mut thread_rng()) {
+//!     actual.push((x, y));
+//! }
+//!
+//! actual.sort();
+//!
+//! assert_eq!(actual, expected);
+
 use rand::Rng;
 
 /// ゲーデル数化を定義します.
