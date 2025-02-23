@@ -5,5 +5,6 @@ pub mod depq;
 pub mod fastarray;
 pub mod kdtree;
 pub mod lca;
+pub mod lowlink;
 pub mod point;
 pub mod simplechooser;
