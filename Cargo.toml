@@ -23,3 +23,7 @@ name = "kdtree"
 [[bench]]
 harness = false
 name = "depq"
+
+[[bench]]
+harness = false
+name = "conslist"

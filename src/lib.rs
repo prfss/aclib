@@ -1,6 +1,7 @@
 #![allow(clippy::many_single_char_names)]
 pub mod boolarray;
 pub mod chooser;
+pub mod conslist;
 pub mod depq;
 pub mod fastarray;
 pub mod kdtree;
